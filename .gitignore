@@ -11,6 +11,7 @@ yarn-error.log*
 *.sqlite
 .gitattributes
 .idea/
+*.map
 LICENSE
 
 # Runtime data
