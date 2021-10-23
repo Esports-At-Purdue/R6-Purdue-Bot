@@ -93,6 +93,6 @@ module.exports = {
                     permission: true
                 },
             ]
-        })
+        });
     }
 }
