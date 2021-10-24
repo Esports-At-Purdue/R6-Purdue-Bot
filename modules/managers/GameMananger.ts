@@ -1,10 +1,11 @@
-import {CategoryChannel, Collection, Guild, TextChannel} from "discord.js";
+import {CategoryChannel, Collection, Guild, MessageEmbed, TextChannel} from "discord.js";
 import {game_category_id, queue_size} from '../../config.json';
 import {Game} from "../db_types/Game";
 import {User} from "../db_types/User";
 import {v4} from "uuid";
 import {R6Map} from "../data_types/R6Map";
 import {app} from "../../index";
+import {Team} from "../db_types/Team";
 
 class GameManager {
     public cache: Collection<string, Game>;
@@ -30,6 +31,39 @@ class GameManager {
 
         }
     }
+
+    async createList(index: number) {
+        await app.gameManager.synchronize();
+
+        index = index ? index : 1;
+        let offset = (index - 1) * 10;
+        let embed = new MessageEmbed().setTitle(`Games List - Page ${index}`);
+
+        const games = await Game.findAll({
+            offset: offset,
+            limit: 10
+        });
+
+        games.reverse();
+        for (const game of games) {
+            let status = game.getStatus() === 1 ? `Active` : `Finished`;
+            let map = game.getMap();
+            let winner = `Pending`;
+
+            if (game.winner) {
+                let gameIndex =  (await game.getWinner()).getIndex();
+                winner = `Team ${gameIndex}`
+            }
+
+            let fieldTitle = `Game ${game.getIndex()}`
+            let fieldDescription = `**Status**: ${status} \n**Winner**: \n**Map**: ${map}`;
+
+            embed.addField(fieldTitle, fieldDescription, true);
+        }
+
+        return embed;
+    }
+
 
     async create(members: Array<User>) {
         await this.synchronize();

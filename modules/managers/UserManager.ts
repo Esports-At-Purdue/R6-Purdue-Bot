@@ -27,10 +27,10 @@ class UserManager {
             let pointsOne = a.getPoints();
             let pointsTwo = b.getPoints();
             if (pointsOne < pointsTwo) {
-                return -1;
+                return 1;
             }
             if (pointsTwo < pointsOne) {
-                return 1;
+                return -1;
             }
             return 0;
         });

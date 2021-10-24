@@ -15,7 +15,7 @@ class Game extends Model {
     private members: string;
     private freeMembers: number;
     private map: string;
-    private winner: string;
+    public winner: string;
     private index: number;
     private status: number;
 
@@ -112,11 +112,14 @@ class Game extends Model {
     async createEmbed() {
         let embed = new MessageEmbed().setTitle(`Game ${this.index} - Purdue University Pro League`).setColor("GOLD").setTimestamp(new Date());
 
+        let winner = this.winner;
         let teams = await this.getTeams();
         let members = await this.getMembers();
         let freeMembers = this.getFreeMembers();
 
         for (const team of teams) {
+            let fieldTitle = `Team ${team.getIndex()}`;
+            fieldTitle = winner === team.getId() ? `WINNER - Team ${team.getIndex()}` : `Team ${team.getIndex()}`;
             let captain = await team.getCaptain();
             let fieldDescription = String(`Captain: ${await app.guild.members.fetch(captain.getId())}`);
             let teamMembers = await team.getMembers();
@@ -127,7 +130,7 @@ class Game extends Model {
                 }
             }
             members.splice(0, 1);
-            embed.addField(`Team ${team.getIndex()}`, fieldDescription, true);
+            embed.addField(fieldTitle, fieldDescription, true);
         }
         if (freeMembers > 0) {
             let fieldDescription = String("");
@@ -139,10 +142,7 @@ class Game extends Model {
         } else {
             embed.setColor("GREEN");
             embed.addField("**Map**", this.map, false);
-            embed.setImage(maps[`${this.map.replace("\s\\", "_").toLowerCase()}`]);
-
-            await app.teamManager.setChannelPermissions(await teams[0].getChannel(), await teams[0].getMembers());
-            await app.teamManager.setChannelPermissions(await teams[1].getChannel(), await teams[1].getMembers());
+            embed.setImage(maps[`${this.map.replace(/ /g,"_").toLowerCase()}`]);
         }
 
         return embed;
@@ -156,7 +156,7 @@ Game.init({
     },
     status: {
         type: DataTypes.INTEGER,
-        defaultValue: 2
+        defaultValue: 1
     },
     members: DataTypes.STRING,
     channel: DataTypes.STRING,
@@ -173,6 +173,17 @@ Game.init({
 Game.addHook('beforeCreate', async (game: Game) => {
     await sendLogToDiscord(new Log(LogType.DATABASE_UPDATE, `New Game Created:\nIndex: **${game.getIndex()}**\nId: ${game.getId()}`))
 })
+
+Game.addHook('beforeUpdate', async (game: Game) => {
+    let freeMembers = game.getFreeMembers();
+    if (freeMembers === 0) {
+        try {
+            let teams = await game.getTeams();
+            await app.teamManager.setChannelPermissions(await teams[0].getChannel(), await teams[0].getMembers());
+            await app.teamManager.setChannelPermissions(await teams[1].getChannel(), await teams[1].getMembers());
+        } catch (error) {}
+    }
+});
 
 export {
     Game
