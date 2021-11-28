@@ -1,2 +1,2 @@
-# R6@Purdue Bot
- Exclusive bot for R6@Purdue
+# r6 purdue bot
+ R6 purdue bot
