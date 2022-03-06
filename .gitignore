@@ -9,6 +9,8 @@ yarn-error.log*
 *.js
 *.json
 *.sqlite
+./maps/*
+./media/*
 .gitattributes
 .idea/
 *.map
@@ -83,3 +85,6 @@ typings/
 
 # FuseBox cache
 .fusebox/
+*.jpg
+*.png
+*.webp
