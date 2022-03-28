@@ -1,4 +1,4 @@
-export default class BasePlayer {
+export default class BasePlayer{
     private _id: string;
     private _username: string;
     

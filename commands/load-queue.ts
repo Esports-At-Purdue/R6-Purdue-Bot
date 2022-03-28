@@ -20,7 +20,7 @@ module.exports = {
 
     async execute(interaction: CommandInteraction) {
         await interaction.deferReply();
-        let documents = await collections.players.find().limit(10).toArray();
+        let documents = await collections.players.find().sort({_rank: 1}).limit(10).toArray();
         for (const document of documents) {
             let player = Player.fromObject(document).getBasePlayer();
             if (player.username != "Techno") await bot.queue.set(player.id, setTimeout(() => {}, 10000));

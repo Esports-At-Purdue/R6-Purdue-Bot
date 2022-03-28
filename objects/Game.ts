@@ -3,7 +3,6 @@ import * as config from "../config.json";
 import Queue from "./Queue";
 import {bot} from "../App";
 import {
-    Base,
     CategoryChannel,
     MessageActionRow,
     MessageAttachment,
@@ -15,8 +14,9 @@ import {collections, updateRankings} from "../database/database.service";
 import * as Canvas from "canvas";
 import BasePlayer from "./BasePlayer";
 import Player from "./Player";
+import {DatabaseObject} from "./Interface";
 
-export default class Game {
+export default class Game implements DatabaseObject {
     private _id: string;
     private _phase: number;
     private _players: Array<object>;
@@ -34,7 +34,7 @@ export default class Game {
         this._winner = winner;
         this._loser = loser;
         this._channel = channel;
-        this._map = map ? map : config.maps[Math.floor(Math.random() * config.maps.length)];
+        this._map = map ?? config.maps[Math.floor(Math.random() * config.maps.length)];
     }
 
     static fromObject(object) {
@@ -43,18 +43,23 @@ export default class Game {
 
     static async create(queue: Queue) {
         let players = [];
+        let id = await collections.games.countDocuments() + 1;
+        let channel = await Game.createChannel(id);
         let mentions = ""
         for (let [key] of queue) {
             players.push(await Player.get(key));
             queue.delete(key);
         }
         players = Game.sort(players);
-        players.forEach(player => { mentions = mentions.concat(`<@!${player.id}> `)});
-        const id = await collections.games.countDocuments() + 1;
-        const teamOne = await Team.create(players[0], 1);
-        const teamTwo = await Team.create(players[1], 2);
-        const game = new Game(id.toString(), 1, players.slice(2), [teamOne, teamTwo], null, null, "", null);
-        const channel = await game.createChannel();
+        players.forEach(player => {
+            mentions = mentions.concat(`<@!${player.id}> `);
+            channel.permissionOverwrites.create(
+                player.id, {"SEND_MESSAGES": true}
+            )
+        });
+        let teamOne = await Team.create(players[0], 1);
+        let teamTwo = await Team.create(players[1], 2);
+        let game = new Game(id.toString(), 1, players.slice(2), [teamOne, teamTwo], null, null, "", null);
         game.channel = channel.id;
         await channel.send({content: mentions, embeds: [game.toEmbed()]}).then(message => {
             message.edit({content: "@everyone"})
@@ -133,6 +138,7 @@ export default class Game {
     }
 
     public async pick(target: BasePlayer, index: number) {
+        let response;
         let channel = await bot.guild.channels.fetch(this.channel) as TextChannel;
         let teamOne = Team.fromObject(this.teams[index]);
         let teamTwo = Team.fromObject(this.teams[Math.abs(index - 1)])
@@ -140,51 +146,27 @@ export default class Game {
         let captainTwo = BasePlayer.fromObject(teamTwo.players[0]);
         this.players = this.players.filter((object) => object["_id"] != target.id);
         switch (this.players.length + 1) {
-            case 8:
-                await channel.send({
+            case 8: case 6:
+                response ={
                     content: `**${captainOne.username}** has picked <@!${target.id}>. <@!${captainTwo.id}> please pick two players.`,
                     components: [this.buildSelectMenu()]
-                })
+                };
                 break;
-            case 7:
-                await channel.send({
-                    content: `**${captainOne.username}** has picked <@!${target.id}>. <@!${captainOne.id}> please pick another player.`,
-                    components: [this.buildSelectMenu()]
-                })
+            case 7: case 5:
+               response = {
+                   content: `**${captainOne.username}** has picked <@!${target.id}>. <@!${captainOne.id}> please pick another player.`,
+                   components: [this.buildSelectMenu()]};
                 break;
-            case 6:
-                await channel.send({
-                    content: `**${captainOne.username}** has picked <@!${target.id}>. <@!${captainTwo.id}> please pick two players.`,
-                    components: [this.buildSelectMenu()]
-                })
-                break;
-            case 5:
-                await channel.send({
-                    content: `**${captainOne.username}** has picked <@!${target.id}>. <@!${captainOne.id}> please pick another player.`,
-                    components: [this.buildSelectMenu()]
-                })
-                break;
-            case 4:
-                await channel.send({
+            case 4: case 3:
+                response = {
                     content: `**${captainOne.username}** has picked <@!${target.id}>. <@!${captainTwo.id}> please pick another player.`,
-                    components: [this.buildSelectMenu()]
-                })
-                break;
-            case 3:
-                await channel.send({
-                    content: `**${captainOne.username}** has picked <@!${target.id}>. <@!${captainTwo.id}> please pick another player.`,
-                    components: [this.buildSelectMenu()]
-                })
+                    components: [this.buildSelectMenu()]};
                 break;
             case 2:
-                await channel.send({
-                    content: `**${captainOne.username}** has picked <@!${target.id}>.`,
-                })
+                response = { content: `**${captainOne.username}** has picked <@!${target.id}>.`};
                 break;
             case 1:
-                await channel.send({
-                    content: `**${captainOne.username}** has received <@!${target.id}>.`,
-                })
+                response = {content: `**${captainOne.username}** has received <@!${target.id}>.`};
                 this.phase = 2;
                 break;
         }
@@ -192,6 +174,7 @@ export default class Game {
         this.teams[index] = teamOne;
         await Team.put(teamOne);
         await Game.put(this);
+        await channel.send(response);
     }
 
     public static sort(players): Array<BasePlayer> {
@@ -214,8 +197,7 @@ export default class Game {
         return players;
     }
 
-    public buildSelectMenu()
-    {
+    public buildSelectMenu() {
         let actionRow = new MessageActionRow();
         let selectMenu = new MessageSelectMenu().setCustomId(`select_teams`).setPlaceholder('Select a player!');
         let players = this.players;
@@ -233,14 +215,15 @@ export default class Game {
         return actionRow;
     }
 
-    async createChannel() {
+    static async createChannel(id) {
         const category = await bot.guild.channels.fetch(config.category) as CategoryChannel;
-        const channel = await category.createChannel(`Game ${this.id}`,
-            {type: "GUILD_TEXT", permissionOverwrites: [
+        return await category.createChannel(`Game ${id}`,
+            {
+                type: "GUILD_TEXT", permissionOverwrites: [
                     {
                         id: config.guild,
-                        deny: ["SEND_MESSAGES"],
-                        allow: ["VIEW_CHANNEL"]
+                        allow: ["VIEW_CHANNEL"],
+                        deny: ["SEND_MESSAGES"]
                     },
                     {
                         id: config.roles.admin,
@@ -249,13 +232,6 @@ export default class Game {
                 ]
             }
         );
-        for (let i = 0; i < 10; i++) {
-            let player = this.players[i] as BasePlayer;
-            await channel.permissionOverwrites.create(
-                player.id, {SEND_MESSAGES: true}
-            )
-        }
-        return channel;
     }
 
     async deleteChannel() {
@@ -317,7 +293,7 @@ export default class Game {
         await Game.put(this);
     }
 
-     toEmbed(): MessageEmbed {
+    toEmbed(): MessageEmbed {
         let embed = new MessageEmbed()
             .setTitle(`Game ${this.id} - Purdue University Pro League`)
 
@@ -387,8 +363,14 @@ export default class Game {
         return (new MessageAttachment(canvas.toBuffer(), `game-${this._id}.png`));
     }
 
-    async save() {
+    async save(): Promise<boolean> {
         await Game.put(this);
+        return true;
+    }
+
+    async delete(): Promise<boolean> {
+        await Game.delete(this);
+        return true;
     }
 
     static async get(id: string) {

@@ -27,11 +27,12 @@ export async function connectToDatabase () {
 }
 
 export async function updateRankings() {
-    const players = (await collections.players.find().sort({_points: -1, _wins: -1, _draws: -1, _losses: 1, _username: 1}).toArray());
+    const players = (await collections.players.find().sort({_points: -1, _wins: -1, _losses: 1, _username: 1}).toArray());
     for (let i = 0; i < players.length; i++) {
         let player = Player.fromObject(players[i]);
+        //console.log(player.username + " - " + player.points);
         bot.guild.members.fetch(player.id).catch(async () => {
-            // await Player.delete(player);
+            //await Player.delete(player);
         })
         player.rank = i + 1;
         await Player.put(player);

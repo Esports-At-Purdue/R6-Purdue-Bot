@@ -1,5 +1,6 @@
 import {SlashCommandBuilder} from "@discordjs/builders";
 import {CommandInteraction} from "discord.js";
+import {bot} from "../App";
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -48,22 +49,32 @@ module.exports = {
     ],
 
     async execute(interaction: CommandInteraction) {
-        let guild = interaction.guild;
-        let subCommand = interaction.options.getSubcommand();
-        let guildRole = interaction.options.getRole("role");
-        let user = interaction.options.getUser("target");
-        let guildMember = await guild.members.fetch(user);
-
+        await interaction.deferReply();
+        let response;
+        let subcommand = interaction.options.getSubcommand();
+        let role = interaction.options.getRole("role");
+        let member = await bot.guild.members.fetch(interaction.options.getUser("target"));
         try {
-            switch(subCommand) {
+            switch(subcommand) {
                 case "add":
-                    await guildMember.roles.add(guildRole.id);
+                    await member.roles.add(role.id);
+                    response = {content: `<@&${role.id}> given to <@!${member.id}>`, ephemeral: true};
                     break;
                 case "remove":
-                    await guildMember.roles.remove(guildRole.id);
+                    await member.roles.remove(role.id);
+                    response = {content: `<@&${role.id}> taken from <@!${member.id}>`, ephemeral: true};
+                    break;
+                default:
+                    response = {content: "Something went very wrong... Please send this to <@!751910711218667562>."};
+                    await bot.logger.fatal("Manage Command Failed", new Error("Inaccessible option"));
             }
-        } catch(e) {}
-
-        await interaction.reply({content: "success", ephemeral: true});
+        } catch(error) {
+            await bot.logger.error("Could not execute /role command", error);
+            response = {content: `This role can't be applied to <@!${member.id}>.`, ephemeral: true};
+        }
+        if (response.ephemeral) {
+            await interaction.deleteReply();
+            await interaction.followUp(response);
+        } else await interaction.editReply(response);
     }
 }

@@ -8,7 +8,7 @@ import {
     MessageEmbed,
     TextChannel
 } from "discord.js";
-import {connectToDatabase, updateRankings} from "../database/database.service";
+import {collections, connectToDatabase, updateRankings} from "../database/database.service";
 import {playersRouter} from "../database/players.router";
 import {teamsRouter} from "../database/teams.router";
 import {gamesRouter} from "../database/games.router";
@@ -19,6 +19,7 @@ import * as express from "express";
 import Queue from "./Queue";
 import * as fs from "fs";
 import Logger from "./Logger";
+import {ApplicationCommandOptionTypes} from "discord.js/typings/enums";
 
 const options = {
     intents: [
@@ -108,7 +109,6 @@ export default class Bot extends Client{
             express().listen(address, () => {
                 this.logger.info(`Server started at http://localhost:${address}`)
             })
-            updateRankings();
         }).catch((error: Error) => {
             this.logger.fatal("Database connection failure", error);
             process.exit(0);
@@ -117,11 +117,7 @@ export default class Bot extends Client{
 
     async initializeQueue() {
         this._queue = new Queue(this._lobbyChannel);
-        const embed = new MessageEmbed().setTitle("A new queue has started").setColor("WHITE");
-        const row = new MessageActionRow().addComponents(
-            new MessageButton().setLabel("Join").setCustomId("join").setStyle("SUCCESS"),
-            new MessageButton().setLabel("Leave").setCustomId("leave").setStyle("DANGER"),
-            new MessageButton().setLabel("View").setCustomId("view").setStyle("SECONDARY"));
+        await this.queue.update("A new queue has started", 3);
         for (const [,message] of (await this.lobbyChannel.messages.fetch({limit: 6}))) {
             if (message.author.id == this.user.id) {
                 await message.edit({components: []});
@@ -130,7 +126,6 @@ export default class Bot extends Client{
                 }
             }
         }
-        await this.lobbyChannel.send({embeds: [embed], components: [row]});
     }
 
     async initializeCommands(token: string) {
@@ -142,8 +137,10 @@ export default class Bot extends Client{
 
         for (const file of commandFiles) {
             const command = require(`../commands/${file}`);
-            commands.push(command.data.toJSON());
-            await this.commands.set(command.data.name, command);
+            if (command.data) {
+                commands.push(command.data.toJSON());
+                await this.commands.set(command.data.name, command);
+            }
         }
 
         try {

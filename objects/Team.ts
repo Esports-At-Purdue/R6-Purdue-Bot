@@ -62,10 +62,12 @@ export default class Team {
     }
 
     async sub(sub: BasePlayer, target: BasePlayer): Promise<boolean> {
-        for (let i = 0; i < 5; i++) {
+        console.log(`Trying to sub ${sub.username} for ${target.username}`)
+        for (let i = 0; i < this.players.length; i++) {
             let player = BasePlayer.fromObject(this._players[i]);
+            console.log(`Comparing ${target.username} to ${player.username}`);
             if (target.id == player.id) {
-                this._players.splice(i, 1);
+                this._players = this._players.splice(i, 1);
                 this._players.push(sub)
                 await Team.put(this);
                 return true;
@@ -77,9 +79,9 @@ export default class Team {
     async setWinner() {
         await this.players.forEach(object => {
             Player.get(object["_id"]).then(player => {
-                    player.points += 10;
-                    player.wins += 1;
-                    Player.put(player);
+                player.points += 10;
+                player.wins += 1;
+                Player.put(player);
             });
         });
     }
@@ -100,12 +102,12 @@ export default class Team {
             {type: "GUILD_VOICE", permissionOverwrites: [
                     {
                         id: config.guild,
-                        deny: ["SPEAK"],
+                        deny: ["USE_VAD"],
                         allow: ["VIEW_CHANNEL", "CONNECT"]
                     },
                     {
                         id: config.roles.admin,
-                        allow: ["MOVE_MEMBERS", "CONNECT", "SPEAK"]
+                        allow: ["MOVE_MEMBERS", "CONNECT", "SPEAK", "USE_VAD"]
                     }
                 ]
             }
@@ -113,8 +115,8 @@ export default class Team {
         for (const object of this._players) {
             let player = BasePlayer.fromObject(object);
             await channel.permissionOverwrites.create(
-               await bot.guild.members.fetch(player.id),
-                {SPEAK: true}
+                await bot.guild.members.fetch(player.id),
+                {SPEAK: true, USE_VAD: true}
             )
             try {
                 let member = await bot.guild.members.fetch(player.id);
@@ -128,9 +130,12 @@ export default class Team {
     async deleteChannel() {
         if (this.channel != null) {
             const channel = await bot.guild.channels.fetch(this.channel);
-            channel.members.each((member) => {
-                member.voice.setChannel(config.channels.voice);
-            })
+            for (let i = 0; i < this.players.length; i++) {
+                try {
+                    let member = await bot.guild.members.fetch(BasePlayer.fromObject(this.players[i]).id);
+                    await member.voice.setChannel(config.channels.voice)
+                } catch (ignored) {}
+            }
             await channel.delete();
             this.channel = null;
             await Team.put(this);

@@ -1,8 +1,9 @@
-import {collections} from "../database/database.service";
+import {collections, updateRankings} from "../database/database.service";
 import {GuildMember, MessageAttachment} from "discord.js";
 import * as Canvas from "canvas";
 import {bot} from "../App";
 import BasePlayer from "./BasePlayer";
+import {DatabaseObject} from "./Interface";
 
 export default class Player extends BasePlayer {
     private _points: number;
@@ -148,6 +149,7 @@ export default class Player extends BasePlayer {
             const newPlayer = (player);
             // @ts-ignore
             return await collections.players.insertOne(newPlayer);
+
 
         } catch (error) {
             console.error(error);

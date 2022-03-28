@@ -8,6 +8,9 @@ import {
     SelectMenuInteraction,
     TextChannel
 } from "discord.js";
+import {collections, updateRankings} from "./database/database.service";
+import Player from "./objects/Player";
+import * as blacklist from "./blacklist.json";
 
 export const bot = new Bot();
 
@@ -15,6 +18,7 @@ bot.login(config.token).then();
 
 bot.on('ready', async () => {
     await bot.init();
+    await updateRankings();
 });
 
 bot.on('interactionCreate', async (interaction) => {
@@ -63,6 +67,7 @@ async function handleCommand(interaction: CommandInteraction) {
         await bot.logger.info(`${interaction.commandName} command issued by ${interaction.user.username}`);
     } catch (error) {
         await bot.logger.error(`${interaction.commandName} command issued by ${interaction.user.username} failed`, error);
+        await interaction.reply({content: "There was an error running this command.", ephemeral: true});
     }
 }
 
@@ -70,9 +75,12 @@ async function handleButton(button: ButtonInteraction) {
     try {
         let id = button.customId;
         switch (id) {
-            case "join": case "leave": case "view":
+            case "join": case "leave": case "bump":
                 await bot.commands.get("queue").execute(button);
                 break;
+            //case "register":
+                //await bot.commands.get("register").execute(button);
+                //break;
             default:
                 let role = await button.guild.roles.fetch(id);
                 let guildMember = button.member as GuildMember;
@@ -82,6 +90,7 @@ async function handleButton(button: ButtonInteraction) {
         await bot.logger.info(`${button.component.label} button used by ${button.user.username}`);
     } catch (error) {
         await bot.logger.error(`${button.component.label} button used by ${button.user.username} failed`, error);
+        await button.reply({content: "There was an error running this handling this button.", ephemeral: true});
     }
 }
 
@@ -91,14 +100,15 @@ async function handleSelectMenu(selectMenu: SelectMenuInteraction) {
         await bot.logger.info(`Select Menu option ${selectMenu.values[0]} selected by ${selectMenu.user.username}`);
     } catch (error) {
         await bot.logger.error(`Select Menu option ${selectMenu.values[0]} selected by ${selectMenu.user.username} failed`, error);
+        await selectMenu.reply({content: "There was an error handling this menu.", ephemeral: true});
     }
 }
 
 /**
- * Executes logic for managing various roles from a ButtonInteraction
- * @param role
- * @param guildMember
- * @param interaction
+ * Executes logic for managing role requests
+ * @param role the requested role
+ * @param guildMember the requester
+ * @param interaction the interaction
  */
 async function requestRole(role: Role, guildMember: GuildMember, interaction: ButtonInteraction) {
     let hasRole = await checkIfMemberHasRole(role.id, guildMember);
@@ -141,11 +151,11 @@ async function requestRole(role: Role, guildMember: GuildMember, interaction: Bu
 
 /**
  * Adds a Role to a GuildMember
- * @param snowflake
- * @param guildMember
+ * @param snowflake the role ID
+ * @param guildMember the member to receive the role
  */
-async function addRoleToMember(snowflake: string, guildMember: GuildMember) {
-    await guildMember.roles.add(snowflake);
+async function addRoleToMember(roleID: string, guildMember: GuildMember) {
+    await guildMember.roles.add(roleID);
 }
 
 /**

@@ -72,10 +72,10 @@ module.exports = {
                     } else response = {content: "You must be the captain to do this.", ephemeral: true};
                 }
             } else response = {content: "You can't do this outside of a game channel.", ephemeral: true};
-            try {
-                if (response instanceof Object) await interaction.reply(response);
-                else if (response != null) interaction.channel.send({content: response});
-            } catch (error) {}
         }
+        try {
+            if (response instanceof Object) await interaction.reply(response);
+            else if (response != null) interaction.channel.send({content: response});
+        } catch (error) {}
     }
 }

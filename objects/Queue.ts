@@ -39,10 +39,13 @@ export default class Queue extends Map<string, NodeJS.Timeout>{
             const timeout = global.setTimeout(Queue.timeout, this.time, this, player);
             this.set(player.id, timeout)
             if (this.size == 10) {
-                await this.update("Queue is full. A new game is starting...", 0);
+                await this.update("A new game is starting...", 0);
+                this.forEach((timeout) => {
+                    clearTimeout(timeout);
+                })
                 bot.queue = new Queue(bot.lobbyChannel);
                 await Game.create(this)
-            } else this.update(`${player.username} has joined the queue.`, 1).then();
+            } else this.update(`${player.username} has joined`, 1).then();
             return ("You have joined the queue.");
         }
     }
@@ -52,27 +55,28 @@ export default class Queue extends Map<string, NodeJS.Timeout>{
         else if (this.has(player.id)) {
             clearTimeout(this.get(player.id));
             this.delete(player.id);
-            this.update(`${player.username} has left the queue.`, 2).then(() => {
+            this.update(`${player.username} has left`, 2).then(() => {
                 return ("You have left the queue.")
             });
         } else return ("You are not in the queue.");
     }
 
     public async update(update: string, code: number, message = null) {
-        let messages = (await this.channel.messages.fetch({limit: 6}))
+        let messages = (await this.channel.messages.fetch({limit: 10}))
             .filter(message => message.author == bot.user);
 
         for (const [, message] of messages) {
             if (message.embeds[0] != undefined && message.embeds[0] != null) {
-                if (message.embeds[0].title.toLowerCase().includes("queue")) await message.delete();
+                if (message.embeds[0].title.toLowerCase().includes("10-mans")) await message.delete();
             }
         }
         let options;
-        let embed = new MessageEmbed().setTitle(update).setDescription("");
+        let embed = new MessageEmbed().setTitle("10-Mans: " + update.concat(` [${this.size}/10]`)).setDescription("");
         const row = new MessageActionRow().addComponents(
             new MessageButton().setLabel("Join").setCustomId("join").setStyle("SUCCESS"),
             new MessageButton().setLabel("Leave").setCustomId("leave").setStyle("DANGER"),
-            new MessageButton().setLabel("View").setCustomId("view").setStyle("SECONDARY"));
+            new MessageButton().setLabel("Bump").setCustomId("bump").setStyle("SECONDARY"),
+            new MessageButton().setLabel("Register").setCustomId(config.roles.registered).setStyle("PRIMARY"));
         let keys = this.keys();
         for (let i = 0; i < this.size; i++) {
             let player = await Player.get(keys.next().value);
@@ -82,6 +86,7 @@ export default class Queue extends Map<string, NodeJS.Timeout>{
             case 0: embed.setColor("BLUE"); break;
             case 1: embed.setColor("GREEN"); break;
             case 2: embed.setColor("ORANGE"); break;
+            case 3: embed.setColor("WHITE"); break;
         }
         if (message != null) options = {content: message, embeds: [embed], components: [row]}
         else options = {embeds: [embed], components: [row]}
@@ -91,6 +96,6 @@ export default class Queue extends Map<string, NodeJS.Timeout>{
 
     static async timeout(queue: Queue, player: BasePlayer) {
         queue.delete(player.id);
-        await queue.update(`${player.username} has been timed out from the queue`, 2, `<@!${player.id}>`);
+        await queue.update(`${player.username} has been timed out`, 2, `<@!${player.id}>`);
     }
 }
