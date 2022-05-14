@@ -1,5 +1,4 @@
 import {SlashCommandBuilder} from "@discordjs/builders";
-import * as config from "../config.json";
 import {CommandInteraction} from "discord.js";
 import Game from "../objects/Game";
 import Player from "../objects/Player";
@@ -221,16 +220,9 @@ module.exports = {
         )
     ,
 
-    permissions: [
-        {
-            id: config.roles.admin,
-            type: "ROLE",
-            permission: true
-        }
-    ],
 
     async execute(interaction: CommandInteraction) {
-        await interaction.deferReply();
+        //await interaction.deferReply();
         let subcommandGroup = interaction.options.getSubcommandGroup()
         let subcommand = interaction.options.getSubcommand();
         let response;
@@ -247,7 +239,7 @@ module.exports = {
                             let target = await Player.get(interaction.options.getUser('target').id);
                             if (sub) {
                                 if (target) {
-                                    if (await game.sub(sub.getBasePlayer(), target.getBasePlayer())) {
+                                    if (await game.sub(sub, target)) {
                                         response = {content: `<@!${sub.id}> has been subbed in for <@!${target.id}>`}
                                     } else response = {content: "This substitution could not be completed.", ephemeral: true};
                                 } else response = {content: "The target is not a valid player.", ephemeral: true};
@@ -277,7 +269,7 @@ module.exports = {
                         player = await Player.get(interaction.options.getUser("target").id);
                         if (player) {
                             if (!bot.queue.has(player.id)) {
-                                await bot.queue.join(player.getBasePlayer());
+                                await bot.queue.join(player);
                                 response = {content: `${player.username} has been added`, ephemeral: true};
                             } else response = {content: `${player.username} is already in queue.`, ephemeral: true};
                         } else response = {content: "This player is not registered.", ephemeral: true};
@@ -363,12 +355,7 @@ module.exports = {
                 await bot.logger.fatal("Manage Command Failed", new Error("Inaccessible option"));
         }
 
-        try {
-            if (response.ephemeral) {
-                await interaction.followUp(response);
-                await interaction.deleteReply();
-            } else await interaction.editReply(response);
-        } catch (error) {}
+        return response;
     }
 }
 const censoredWords = blacklist.list.split(" ");

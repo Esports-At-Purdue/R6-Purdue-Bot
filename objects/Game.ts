@@ -12,7 +12,6 @@ import {
 } from "discord.js";
 import {collections, updateRankings} from "../database/database.service";
 import * as Canvas from "canvas";
-import BasePlayer from "./BasePlayer";
 import Player from "./Player";
 import {DatabaseObject} from "./Interface";
 
@@ -45,13 +44,15 @@ export default class Game implements DatabaseObject {
         let players = [];
         let id = await collections.games.countDocuments() + 1;
         let channel = await Game.createChannel(id);
+        await channel.permissionOverwrites.create("637134609053646879", {"VIEW_CHANNEL": false});
         let mentions = ""
         for (let [key] of queue) {
             players.push(await Player.get(key));
             queue.delete(key);
         }
-        players = Game.sort(players);
+        players = mergeSort(players) as Array<Player>;
         players.forEach(player => {
+            console.log(player.username + ": " + player.rank);
             mentions = mentions.concat(`<@!${player.id}> `);
             channel.permissionOverwrites.create(
                 player.id, {"SEND_MESSAGES": true}
@@ -61,8 +62,8 @@ export default class Game implements DatabaseObject {
         let teamTwo = await Team.create(players[1], 2);
         let game = new Game(id.toString(), 1, players.slice(2), [teamOne, teamTwo], null, null, "", null);
         game.channel = channel.id;
-        await channel.send({content: mentions, embeds: [game.toEmbed()]}).then(message => {
-            message.edit({content: "@everyone"})
+        await channel.send({content: `${mentions}`, embeds: [game.toEmbed()]}).then(message => {
+            //message.edit({content: "@everyone"})
             channel.send({content: `\n\n<@!${game.teams[0]["players"][0]["_id"]}> please pick the first player!`, components: [game.buildSelectMenu()]});
         });
         await Game.post(game);
@@ -137,36 +138,36 @@ export default class Game implements DatabaseObject {
         return new MessageAttachment(`./maps/${mapFileName}.jpg`);
     }
 
-    public async pick(target: BasePlayer, index: number) {
+    public async pick(target: Player, index: number) {
         let response;
         let channel = await bot.guild.channels.fetch(this.channel) as TextChannel;
         let teamOne = Team.fromObject(this.teams[index]);
         let teamTwo = Team.fromObject(this.teams[Math.abs(index - 1)])
-        let captainOne = BasePlayer.fromObject(teamOne.players[0]);
-        let captainTwo = BasePlayer.fromObject(teamTwo.players[0]);
+        let captainOne = Player.fromObject(teamOne.players[0]);
+        let captainTwo = Player.fromObject(teamTwo.players[0]);
         this.players = this.players.filter((object) => object["_id"] != target.id);
         switch (this.players.length + 1) {
             case 8: case 6:
                 response ={
-                    content: `**${captainOne.username}** has picked <@!${target.id}>. <@!${captainTwo.id}> please pick two players.`,
+                    content: `**${captainOne.username}** has picked **${target.username}**. <@!${captainTwo.id}> please pick two players.`,
                     components: [this.buildSelectMenu()]
                 };
                 break;
             case 7: case 5:
                response = {
-                   content: `**${captainOne.username}** has picked <@!${target.id}>. <@!${captainOne.id}> please pick another player.`,
+                   content: `**${captainOne.username}** has picked **${target.username}**. <@!${captainOne.id}> please pick another player.`,
                    components: [this.buildSelectMenu()]};
                 break;
             case 4: case 3:
                 response = {
-                    content: `**${captainOne.username}** has picked <@!${target.id}>. <@!${captainTwo.id}> please pick another player.`,
+                    content: `**${captainOne.username}** has picked **${target.username}**. <@!${captainTwo.id}> please pick another player.`,
                     components: [this.buildSelectMenu()]};
                 break;
             case 2:
-                response = { content: `**${captainOne.username}** has picked <@!${target.id}>.`};
+                response = { content: `**${captainOne.username}** has picked **${target.username}**.`};
                 break;
             case 1:
-                response = {content: `**${captainOne.username}** has received <@!${target.id}>.`};
+                response = {content: `**${captainOne.username}** has received **${target.username}**.`};
                 this.phase = 2;
                 break;
         }
@@ -177,32 +178,12 @@ export default class Game implements DatabaseObject {
         await channel.send(response);
     }
 
-    public static sort(players): Array<BasePlayer> {
-        let list = config.players.reverse();
-        players.sort(function (playerOne, playerTwo) {
-            if (list.includes(playerOne.username) || list.includes(playerTwo.username)) {
-                if (list.indexOf(playerOne.username) < list.indexOf(playerTwo.username)) return 1;
-                if (list.indexOf(playerTwo.username) < list.indexOf(playerOne.username)) return -1;
-                return 0
-            } else {
-                if (playerOne.points < playerTwo.points) return 1;
-                if (playerTwo.points < playerOne.points) return -1;
-                return 0;
-            }
-        });
-        for (let i = 0; i < players.length; i++) {
-            players.push(BasePlayer.fromObject(players[0]));
-            players = players.slice(1);
-        }
-        return players;
-    }
-
     public buildSelectMenu() {
         let actionRow = new MessageActionRow();
         let selectMenu = new MessageSelectMenu().setCustomId(`select_teams`).setPlaceholder('Select a player!');
         let players = this.players;
         for (const object of players) {
-            let player = BasePlayer.fromObject(object);
+            let player = Player.fromObject(object);
             selectMenu.addOptions([
                 {
                     label: player.username,
@@ -216,22 +197,8 @@ export default class Game implements DatabaseObject {
     }
 
     static async createChannel(id) {
-        const category = await bot.guild.channels.fetch(config.category) as CategoryChannel;
-        return await category.createChannel(`Game ${id}`,
-            {
-                type: "GUILD_TEXT", permissionOverwrites: [
-                    {
-                        id: config.guild,
-                        allow: ["VIEW_CHANNEL"],
-                        deny: ["SEND_MESSAGES"]
-                    },
-                    {
-                        id: config.roles.admin,
-                        allow: ["SEND_MESSAGES"]
-                    }
-                ]
-            }
-        );
+        const category = await bot.guild.channels.fetch(config.channels.categories.general) as CategoryChannel;
+        return await category.createChannel(`game ${id}`);
     }
 
     async deleteChannel() {
@@ -245,19 +212,24 @@ export default class Game implements DatabaseObject {
     async start() {
         this.phase = 2;
         let channel = await bot.guild.channels.fetch(this.channel) as TextChannel;
+        let mentions = "";
         let embed = this.toEmbed();
         let attachment = this.getMapAttachment();
         for (let i = 0; i < 2; i ++) {
             let team = Team.fromObject(this.teams[i]);
             await team.createChannel();
+            for (let j = 0; j < team.players.length; j++) {
+                let player = Player.fromObject(team.players[j]);
+                mentions = mentions = mentions.concat(`<@!${player.id}> `);
+            }
         }
-        await channel.send({embeds: [embed], files: [attachment]});
+        await channel.send({content: `${mentions}`, embeds: [embed], files: [attachment]});
     }
 
-    async sub(sub: BasePlayer, target: BasePlayer): Promise<boolean> {
+    async sub(sub: Player, target: Player): Promise<boolean> {
         let response = false;
         for (let i = 0; i < this.players.length; i++) {
-            let player = BasePlayer.fromObject(this._players[i]);
+            let player = Player.fromObject(this._players[i]);
             if (target.id == player.id) {
                 this._players.splice(i, 1);
                 this._players.push(sub)
@@ -271,7 +243,7 @@ export default class Game implements DatabaseObject {
     }
 
     async end(code: number) {
-        let channel = await bot.guild.channels.fetch(config.channels.report) as TextChannel;
+        let channel = await bot.guild.channels.fetch(config.channels["10mans"]) as TextChannel;
         this.phase = 0;
         await (await Team.get(this.teams[0]["_id"])).deleteChannel();
         await (await Team.get(this.teams[1]["_id"])).deleteChannel();
@@ -299,10 +271,11 @@ export default class Game implements DatabaseObject {
 
         for (let i = 0; i < 2; i++) {
             const team = Team.fromObject(this.teams[i]);
-            const title = team == this.winner ? `WINNER - Team ${team.index}` : `Team ${team.index}`;
-            let description = `Captain: <@!${BasePlayer.fromObject(team.players[0]).id}>`;
+            let  title = `Team ${team.index}`;
+            if (this.winner != null) title = team.id == Team.fromObject(this.winner).id ? `WINNER - Team ${team.index}` : title;
+            let description = `Captain: <@!${Player.fromObject(team.players[0]).id}>`;
             for (let j = 1; j < 5; j++) {
-               if (team.players[j]) description = description.concat(`\nPlayer: <@!${BasePlayer.fromObject(team.players[j]).id}>`);
+               if (team.players[j]) description = description.concat(`\nPlayer: <@!${Player.fromObject(team.players[j]).id}>`);
             }
             embed.addField(title, description, true);
         }
@@ -343,15 +316,26 @@ export default class Game implements DatabaseObject {
 
         if (this.phase == 0) {
             if (this.winner && this.loser) {
-
+                let winner = Team.fromObject(this.winner);
+                let loser = Team.fromObject(this.loser);
+                for (let i = 0; i < 5; i++) {
+                    let winnerPlayer = Player.fromObject(winner.players[i]);
+                    let loserPlayer = Player.fromObject(loser.players[i]);
+                    console.log(winnerPlayer.username);
+                    console.log(loserPlayer.username)
+                    let winnerAvatar = await Canvas.loadImage((await bot.guild.members.fetch(winnerPlayer.id)).user.displayAvatarURL({ format: 'jpg' }));
+                    let loserAvatar = await Canvas.loadImage((await bot.guild.members.fetch(loserPlayer.id)).user.displayAvatarURL({ format: 'jpg' }));
+                    printAvatar(ctx, winnerAvatar, canvas.width / 5, 135 + i * 30);
+                    printAvatar(ctx, loserAvatar, canvas.width - canvas.width / 5, 135 + i * 25);
+                }
             } else {
                 for (let i = 0; i < 2; i++) {
                     let team = Team.fromObject(this.teams[i]);
                     printText(ctx, `Draw`, canvas.width / 4 + i * (canvas.width / 2), 110, "#000000", `28${font}`, "center");
                     for (let j = 0; j < 5; j++) {
-                        let player = BasePlayer.fromObject(team.players[j]);
-                        // let avatar = await Canvas.loadImage((await bot.guild.members.fetch(player.id)).avatarURL({format: "jpg"}));
-                        // printAvatar(ctx, avatar, i, j, canvas.width);
+                        let player = Player.fromObject(team.players[j]);
+                        let avatar = await Canvas.loadImage((await bot.guild.members.fetch(player.id)).user.avatarURL({format: "jpg"}));
+                        printAvatar(ctx, avatar, i, j);
                         printText(ctx, player.username, canvas.width / 4 + i * (canvas.width / 2), 135 + j * 25, "#000000", `24${font}`, "center");
                     }
                 }
@@ -359,6 +343,8 @@ export default class Game implements DatabaseObject {
         } else {
 
         }
+
+
 
         return (new MessageAttachment(canvas.toBuffer(), `game-${this._id}.png`));
     }
@@ -407,6 +393,38 @@ export default class Game implements DatabaseObject {
     }
 }
 
+function mergeSort(players: Array<Player>) {
+    const half = players.length / 2
+
+    if (players.length < 2){
+        return players
+    }
+
+    const left = players.splice(0, half)
+    return merge(mergeSort(left),mergeSort(players))
+}
+
+function merge(left: Array<Player>, right: Array<Player>) {
+    let arr = []
+    let list = config.players;
+    while (left.length && right.length) {
+        let leftIndex = list.indexOf(left[0].id);
+        let rightIndex = list.indexOf(right[0].id);
+        if (leftIndex > rightIndex) {
+            arr.push(left.shift())
+        } else if (rightIndex > leftIndex) {
+            arr.push(right.shift())
+        } else {
+            if (left[0].rank < right[0].rank) {
+                arr.push(left.shift())
+            } else {
+                arr.push(right.shift())
+            }
+        }
+    }
+    return [ ...arr, ...left, ...right ]
+}
+
 function printText(ctx, text, x, y, color, font, alignment) {
     ctx.fillStyle = color;
     ctx.textAlign = alignment;
@@ -436,15 +454,18 @@ function printImage(ctx, image, x, y, width, height, radius) {
     ctx.save();
 }
 
-function printAvatar(ctx, avatar, row, column, width) {
+function printAvatar(ctx, avatar, row, column) {
     ctx.beginPath();
-    ctx.arc((width / 4 + column * (width / 2)) - 30, 135 + row * 25, 13, 0, Math.PI * 2, true);
+    ctx.arc(row + 12.5, column + 12.5, 13, 0, Math.PI * 2, true);
     ctx.fillStyle = "#ffffff";
     ctx.clip();
     ctx.fill();
     ctx.save();
     ctx.beginPath();
-    ctx.arc((width / 4 + column * (width / 2)) - 30, 135 + row * 25, 12.5, 0, Math.PI * 2, true);
+    ctx.arc(row + 12.5, column + 12.5, 12.5, 0, Math.PI * 2, true);
+    ctx.fillStyle = "#000000";
     ctx.clip();
-    ctx.drawImage(avatar, (width / 4 + column * (width / 2)) - 30, 135 + row * 25, 25, 25);
+    ctx.fill();
+    ctx.save();
+    ctx.drawImage(avatar, row, column, 25, 25);
 }

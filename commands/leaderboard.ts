@@ -1,8 +1,7 @@
 import {SlashCommandBuilder} from "@discordjs/builders";
 import {CommandInteraction, GuildMember, MessageAttachment} from "discord.js";
 import * as Canvas from "canvas";
-import * as config from "../config.json";
-import {collections} from "../database/database.service";
+import {collections, updateRankings} from "../database/database.service";
 import Player from "../objects/Player";
 import {bot} from "../App";
 
@@ -10,26 +9,18 @@ module.exports = {
     data: new SlashCommandBuilder()
         .setName('leaderboard')
         .setDescription('Displays the PUPL Leaderboard')
-        .setDefaultPermission(false)
+        .setDefaultPermission(true)
         .addIntegerOption((option) => option
             .setName('page')
             .setDescription('The page of the leaderboard')
             .setRequired(false)
         ),
 
-    permissions: [
-        {
-            id: config.roles.registered,
-            type: 'ROLE',
-            permission: true
-        },
-    ],
-
     async execute(interaction: CommandInteraction) {
-        await interaction.deferReply();
         let page = interaction.options.getInteger('page');
         page = page ? page : 1;
 
+        await updateRankings();
         let offset = (page - 1) * 10;
 
         // const canvas = Canvas.createCanvas(1600, 2112);
@@ -82,7 +73,7 @@ module.exports = {
         }
 
         let attachment = new MessageAttachment(canvas.toBuffer(), 'leaderboard.png');
-        await interaction.editReply({files: [attachment]});
+        return ({content: `<@${interaction.user.id}>`, files: [attachment]});
     },
 }
 

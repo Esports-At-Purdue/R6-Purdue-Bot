@@ -1,9 +1,8 @@
 import {collections} from "../database/database.service";
 import * as config from "../config.json";
 import {bot} from "../App";
-import {CategoryChannel, VoiceChannel} from "discord.js";
+import {CategoryChannel} from "discord.js";
 import Player from "./Player";
-import BasePlayer from "./BasePlayer";
 
 export default class Team {
     private _id: string;
@@ -19,6 +18,7 @@ export default class Team {
     }
 
     static fromObject(object) {
+        if (object == null) return null;
         return new Team(object._id, object._index,  object._channel, object._players);
     }
 
@@ -61,10 +61,10 @@ export default class Team {
         this._players = value;
     }
 
-    async sub(sub: BasePlayer, target: BasePlayer): Promise<boolean> {
+    async sub(sub: Player, target: Player): Promise<boolean> {
         console.log(`Trying to sub ${sub.username} for ${target.username}`)
         for (let i = 0; i < this.players.length; i++) {
-            let player = BasePlayer.fromObject(this._players[i]);
+            let player = Player.fromObject(this._players[i]);
             console.log(`Comparing ${target.username} to ${player.username}`);
             if (target.id == player.id) {
                 this._players = this._players.splice(i, 1);
@@ -79,7 +79,7 @@ export default class Team {
     async setWinner() {
         await this.players.forEach(object => {
             Player.get(object["_id"]).then(player => {
-                player.points += 10;
+                player.points += 2;
                 player.wins += 1;
                 Player.put(player);
             });
@@ -89,7 +89,7 @@ export default class Team {
     async setLoser() {
         await this.players.forEach(object => {
             Player.get(object["_id"]).then(player => {
-                player.points -= player.points > 7 ? 7 : player.points;
+                player.points += 1;
                 player.losses += 1;
                 Player.put(player);
             });
@@ -97,23 +97,22 @@ export default class Team {
     }
 
     async createChannel() {
-        const category = await bot.guild.channels.fetch(config.category) as CategoryChannel;
+        const category = await bot.guild.channels.fetch(config.channels.categories.voice) as CategoryChannel;
         const channel = await category.createChannel(`Team ${this.index} Voice`,
             {type: "GUILD_VOICE", permissionOverwrites: [
                     {
                         id: config.guild,
-                        deny: ["USE_VAD"],
-                        allow: ["VIEW_CHANNEL", "CONNECT"]
+                        allow: ["CONNECT"]
                     },
                     {
                         id: config.roles.admin,
-                        allow: ["MOVE_MEMBERS", "CONNECT", "SPEAK", "USE_VAD"]
+                        allow: ["MOVE_MEMBERS"]
                     }
                 ]
             }
         )
         for (const object of this._players) {
-            let player = BasePlayer.fromObject(object);
+            let player = Player.fromObject(object);
             await channel.permissionOverwrites.create(
                 await bot.guild.members.fetch(player.id),
                 {SPEAK: true, USE_VAD: true}
@@ -132,8 +131,8 @@ export default class Team {
             const channel = await bot.guild.channels.fetch(this.channel);
             for (let i = 0; i < this.players.length; i++) {
                 try {
-                    let member = await bot.guild.members.fetch(BasePlayer.fromObject(this.players[i]).id);
-                    await member.voice.setChannel(config.channels.voice)
+                    let member = await bot.guild.members.fetch(Player.fromObject(this.players[i]).id);
+                    await member.voice.setChannel(config.channels["10mans-vc"])
                 } catch (ignored) {}
             }
             await channel.delete();

@@ -10,21 +10,12 @@ module.exports = {
         .setDescription("Queue testing command")
         .setDefaultPermission(false),
 
-    permissions: [
-        {
-            id: "751910711218667562",
-            type: "USER",
-            permission: true
-        }
-    ],
-
     async execute(interaction: CommandInteraction) {
-        await interaction.deferReply();
         let documents = await collections.players.find().sort({_rank: 1}).limit(10).toArray();
         for (const document of documents) {
-            let player = Player.fromObject(document).getBasePlayer();
+            let player = Player.fromObject(document);
             if (player.username != "Techno") await bot.queue.set(player.id, setTimeout(() => {}, 10000));
         }
-        await interaction.editReply({content: "Queue Loaded."});
+        return ({content: "Queue Loaded.", ephemeral: true});
     }
 }

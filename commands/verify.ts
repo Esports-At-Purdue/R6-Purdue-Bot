@@ -10,9 +10,9 @@ module.exports = {
     data: new SlashCommandBuilder()
         .setName('verify')
         .setDescription('Initiates Purdue email verification process')
-        .setDefaultPermission(false)
+        .setDefaultPermission(true)
 
-        // add - subcommand
+        // start - subcommand
         .addSubcommand((command) => command
             .setName('start')
             .setDescription('Command to initiate verification')
@@ -23,7 +23,7 @@ module.exports = {
             )
         )
 
-        // remove - subcommand
+        // complete - subcommand
         .addSubcommand((command) => command
             .setName('complete')
             .setDescription('Completes Purdue email verification process.')
@@ -31,21 +31,11 @@ module.exports = {
                 .setName("code")
                 .setDescription("The code received in verification email")
                 .setRequired(true)
-                .setMinValue(0)
-                .setMaxValue(999999)
             )
         ),
 
-    permissions: [
-        {
-            id: config.guild,
-            type: 'ROLE',
-            permission: true
-        },
-    ],
 
     async execute(interaction: CommandInteraction) {
-        await interaction.deferReply({ephemeral: true});
         let response;
         let subcommand = interaction.options.getSubcommand();
         let student = await Student.get(interaction.user.id);
@@ -55,26 +45,45 @@ module.exports = {
                 let email = interaction.options.getString('email');
                 if (student) {
                     if (student.status) {
-                        response = {content: "You have already been verified.", ephemeral: true};
+                        response = {content: "You are verified.", ephemeral: true};
                         await (interaction.member as GuildMember).roles.add(config.roles.purdue);
+                        await (interaction.member as GuildMember).roles.remove(config.roles.other);
                     } else response = {content: "Please finish verification with \`/verify complete\`.", ephemeral: true};
-                } else if (await collections.students.findOne({_email: email})) {
-                    response = {content: "This email is already in use.", ephemeral: true}
-                } else if (isValidEmail(email)) {
-                    let code = Math.floor(100000 + Math.random() * 900000);
-                    let username = interaction.user.username;
-                    await sendEmail(email, code);
-                    await bot.logger.info(`New Student Registered - Username: ${username}`)
-                    await Student.post(new Student(interaction.user.id, username, email, code, false));
-                    response = {content: `An email containing your one-time code was sent to \`${email}\`.`, ephemeral: true};
+                } else {
+                    student = Student.fromObject(await collections.students.findOne({_email: email}));
+                    if (student != null) {
+                        if (student.status) {
+                            response = {content: "This email is already in use.", ephemeral: true}
+                        } else {
+                            await Student.delete(student);
+                            let code = Math.floor(100000 + Math.random() * 900000);
+                            let username = interaction.user.username;
+                            await sendEmail(email, code);
+                            await bot.logger.info(`New Student Registered - Username: ${username}`)
+                            await Student.post(new Student(interaction.user.id, username, email, code, false));
+                            response = {content: `An email containing your one-time code was sent to \`${email}\`.`, ephemeral: true};
+                        }
+                    } else {
+                        if (isValidEmail(email)) {
+                            let code = Math.floor(100000 + Math.random() * 900000);
+                            let username = interaction.user.username;
+                            await sendEmail(email, code);
+                            await bot.logger.info(`New Student Registered - Username: ${username}`)
+                            await Student.post(new Student(interaction.user.id, username, email, code, false));
+                            response = {content: `An email containing your one-time code was sent to \`${email}\`.`, ephemeral: true};
+                        } else {
+                            response = {content: `The email you provided, \`${email}\`, is invalid. Please provide a valid Purdue email.`, ephemeral: true};
+                        }
+                    }
                 }
                 break;
             case "complete":
                 if (student) {
                     let code = interaction.options.getInteger('code');
                     if (student.status) {
-                        response = {content: "You have already been authenticated!", ephemeral: true};
+                        response = {content: "You are verified.", ephemeral: true};
                         await (interaction.member as GuildMember).roles.add(config.roles.purdue);
+                        await (interaction.member as GuildMember).roles.remove(config.roles.other);
                     } else if (code == student.code) {
                         student.code = 0;
                         student.status = true;
@@ -91,10 +100,7 @@ module.exports = {
                 response = {content: "Something went very wrong... Please send this to <@!751910711218667562>."};
                 throw new Error("Verify command failed - Inaccessible option");
         }
-        if (response.ephemeral) {
-            await interaction.deleteReply();
-            await interaction.followUp(response);
-        } else await interaction.editReply(response);
+        return (response);
     }
 }
 
@@ -115,15 +121,14 @@ async function sendEmail(email, code) {
         from: config.email.username,
         to: email,
         subject: 'PUGG Discord Account Verification',
-        text: `Use this one-time code to verify your account!\nCode: ${code}\nUse the command \'/verify complete\' in any channel.`
+        text:
+            `Use this one-time code to verify your account!
+            \nCode: ${code}\nUse the command \'/verify complete\' in #verify.`
     };
 
-    await transporter.sendMail(mailOptions, function (error, info) {
-        if (error) {
-            console.log(error);
-        } else {
-            console.log('Email sent: ' + info.response);
-        }
+    await transporter.sendMail(mailOptions, async function (error, info) {
+        if (error) await bot.logger.error(`An error occurred sending an email to ${email}`, error);
+        else await bot.logger.info("Verification email sent");
     });
 }
 

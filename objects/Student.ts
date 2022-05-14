@@ -16,6 +16,7 @@ export default class Student {
     }
 
     static fromObject(object) {
+        if (object == null) return null;
         return new Student(object._id, object._username, object._email, object._code, object._status);
     }
 

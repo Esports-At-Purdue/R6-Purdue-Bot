@@ -1,11 +1,11 @@
-import {collections, updateRankings} from "../database/database.service";
+import {collections} from "../database/database.service";
 import {GuildMember, MessageAttachment} from "discord.js";
 import * as Canvas from "canvas";
 import {bot} from "../App";
-import BasePlayer from "./BasePlayer";
-import {DatabaseObject} from "./Interface";
 
-export default class Player extends BasePlayer {
+export default class Player {
+    private _id: string;
+    private _username: string;
     private _points: number;
     private _wins: number;
     private _losses: number;
@@ -14,7 +14,8 @@ export default class Player extends BasePlayer {
     private _banTime: number;
 
     constructor(id: string, username: string, points = 0, wins = 0, losses = 0, draws = 0, rank = null, banTime = 0) {
-        super(id, username);
+        this._id = id;
+        this._username = username;
         this._points = points;
         this._wins = wins;
         this._losses = losses;
@@ -29,8 +30,25 @@ export default class Player extends BasePlayer {
     } // fromString
 
     static fromObject(object): Player {
+        if (object == null) return null;
         return new Player(object._id, object._username, object._points, object._wins, object._losses, object._draws, object._rank, object._banTime);
     } // Player.fromObject
+
+    get id(): string {
+        return this._id;
+    }
+
+    set id(value: string) {
+        this._id = value;
+    }
+
+    get username(): string {
+        return this._username;
+    }
+
+    set username(value: string) {
+        this._username = value;
+    }
 
     get points(): number {
         return this._points;
@@ -78,10 +96,6 @@ export default class Player extends BasePlayer {
 
     set banTime(value: number) {
         this._banTime = value;
-    }
-
-    getBasePlayer() {
-        return BasePlayer.fromObject(this);
     }
 
     toString(): string {
@@ -204,6 +218,8 @@ function printAvatar(ctx, avatar) {
     ctx.save();
     ctx.beginPath();
     ctx.arc(86.5, 78.5, 62.5, 0, Math.PI * 2, true);
+    ctx.fillStyle = "#000000";
     ctx.clip();
+    ctx.fill();
     ctx.drawImage(avatar, 24, 16, 125, 125);
 }

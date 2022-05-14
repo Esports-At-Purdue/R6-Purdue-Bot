@@ -7,7 +7,7 @@ export const collections: { games?: mongoDB.Collection, teams?: mongoDB.Collecti
 
 export async function connectToDatabase () {
     dotenv.config();
-    const client: mongoDB.MongoClient = new mongoDB.MongoClient("mongodb://localhost:27017");
+    const client: mongoDB.MongoClient = new mongoDB.MongoClient("mongodb://10.0.0.253:27017");
     await client.connect();
 
     const db: mongoDB.Db = client.db("R6@Purdue");
@@ -30,7 +30,6 @@ export async function updateRankings() {
     const players = (await collections.players.find().sort({_points: -1, _wins: -1, _losses: 1, _username: 1}).toArray());
     for (let i = 0; i < players.length; i++) {
         let player = Player.fromObject(players[i]);
-        //console.log(player.username + " - " + player.points);
         bot.guild.members.fetch(player.id).catch(async () => {
             //await Player.delete(player);
         })

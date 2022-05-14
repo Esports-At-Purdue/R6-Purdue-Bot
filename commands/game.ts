@@ -1,5 +1,4 @@
 import {SlashCommandBuilder} from "@discordjs/builders";
-import * as config from "../config.json";
 import {CommandInteraction} from "discord.js";
 import Game from "../objects/Game";
 import {bot} from "../App";
@@ -8,7 +7,7 @@ module.exports = {
     data: new SlashCommandBuilder()
         .setName("game")
         .setDescription("General-use command for viewing and managing games")
-        .setDefaultPermission(false)
+        .setDefaultPermission(true)
 
         // info - subcommand
         .addSubcommand((command) => command
@@ -21,16 +20,7 @@ module.exports = {
         )
     ,
 
-    permissions: [
-        {
-            id: config.roles.registered,
-            type: "ROLE",
-            permission: true
-        }
-    ],
-
     async execute(interaction: CommandInteraction) {
-        await interaction.deferReply();
         let response;
         const subcommand = interaction.options.getSubcommand();
         const game = await Game.get(interaction.options.getInteger("id").toString());
@@ -38,22 +28,17 @@ module.exports = {
         if (game) {
             switch (subcommand) {
                 case "info":
-                    await interaction.deferReply();
-                    const file = await game.toImage();
-                    await interaction.editReply({files: [file]});
-                    response = null;
+                    const embed = await game.toEmbed();
+                    //const file = await game.toImage();
+                    response = ({embeds: [embed]});
                     break;
                 default:
-                    response = {content: "Something went very wrong... Please send this to <@!751910711218667562>."};
+                    response = {content: "Something went very wrong... Please send this to <@!751910711218667562>.", ephemeral: true};
                     await bot.logger.fatal("Manage Command Failed", new Error("Inaccessible option"));
             }
         }
         else response = {content: "This game does not exist.", ephemeral: true};
-        if (response) {
-            if (response.ephemeral) {
-                await interaction.deleteReply();
-                await interaction.followUp(response);
-            } else await interaction.editReply(response);
-        }
+
+        return response;
     }
 }

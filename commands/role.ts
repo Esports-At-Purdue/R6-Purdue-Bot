@@ -40,16 +40,7 @@ module.exports = {
             )
         ),
 
-    permissions: [
-        {
-            id: "751910711218667562",
-            type: 'USER',
-            permission: true
-        }
-    ],
-
     async execute(interaction: CommandInteraction) {
-        await interaction.deferReply();
         let response;
         let subcommand = interaction.options.getSubcommand();
         let role = interaction.options.getRole("role");
@@ -72,9 +63,6 @@ module.exports = {
             await bot.logger.error("Could not execute /role command", error);
             response = {content: `This role can't be applied to <@!${member.id}>.`, ephemeral: true};
         }
-        if (response.ephemeral) {
-            await interaction.deleteReply();
-            await interaction.followUp(response);
-        } else await interaction.editReply(response);
+        return response;
     }
 }

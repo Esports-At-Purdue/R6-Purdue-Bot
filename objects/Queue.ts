@@ -3,8 +3,6 @@ import {bot} from "../App";
 import Player from "./Player";
 import Game from "./Game";
 import * as config from "../config.json";
-import BasePlayer from "./BasePlayer";
-import * as process from "process";
 
 export default class Queue extends Map<string, NodeJS.Timeout>{
     private _time: number;
@@ -32,7 +30,7 @@ export default class Queue extends Map<string, NodeJS.Timeout>{
         this._channel = value;
     }
 
-    public async join(player: BasePlayer): Promise<string> {
+    public async join(player: Player): Promise<string> {
         if (this.has(player.id)) return ("You are already in the queue.");
         else if (this.size == 10) return ("The queue is already full.");
         else {
@@ -46,18 +44,18 @@ export default class Queue extends Map<string, NodeJS.Timeout>{
                 bot.queue = new Queue(bot.lobbyChannel);
                 await Game.create(this)
             } else this.update(`${player.username} has joined`, 1).then();
-            return ("You have joined the queue.");
+            return undefined;
         }
     }
 
-    public remove(player: BasePlayer): string {
+    public remove(player: Player): string {
         if (this.size == 10) return ("Queue has filled. You cannot leave at this time.");
         else if (this.has(player.id)) {
             clearTimeout(this.get(player.id));
             this.delete(player.id);
             this.update(`${player.username} has left`, 2).then(() => {
-                return ("You have left the queue.")
             });
+            return undefined;
         } else return ("You are not in the queue.");
     }
 
@@ -91,10 +89,10 @@ export default class Queue extends Map<string, NodeJS.Timeout>{
         if (message != null) options = {content: message, embeds: [embed], components: [row]}
         else options = {embeds: [embed], components: [row]}
         this.channel.send(options).then();
-
+        return undefined;
     }
 
-    static async timeout(queue: Queue, player: BasePlayer) {
+    static async timeout(queue: Queue, player: Player) {
         queue.delete(player.id);
         await queue.update(`${player.username} has been timed out`, 2, `<@!${player.id}>`);
     }

@@ -1,5 +1,4 @@
 import {SlashCommandBuilder} from "@discordjs/builders";
-import * as config from "../config.json";
 import {CommandInteraction, MessageEmbed} from "discord.js";
 import {bot} from "../App";
 
@@ -9,15 +8,8 @@ module.exports = {
         .setDescription("Displays info about other commands.")
         .setDefaultPermission(true),
 
-    permissions: [
-        {
-            id: config.guild,
-            type: "ROLE",
-            permission: true
-        }
-    ],
-
     async execute(interaction: CommandInteraction) {
+        let response;
         let embed = new MessageEmbed().setTitle("Help Menu - R6@Purdue").setColor("#5a69ea").setDescription("");
         let list = [];
         await bot.commands.forEach(command => {
@@ -33,7 +25,8 @@ module.exports = {
                 }
                 embed.setDescription(embed.description.concat("\n"))
             //}
-        } await interaction.reply({embeds: [embed]});
+        } response = ({embeds: [embed]});
+        return response;
     }
 }
 
