@@ -202,7 +202,7 @@ async function updateRegistrations() {
     embed.addField(subField.name, subField.value, subField.inline);
     embed.setTitle(`Spots Remaining: ${50 - total}`);
 
-    let webhook = await bot.fetchWebhook("974541067351380028", "ukYUtDeYFc6Q7F45ayUnjqORUBn82ocW7isB6bGlj4kMW7_AXRLGQgxED_hie_SZ2HzI");
+    let webhook = await bot.fetchWebhook(config.webhooks.registration.id, config.webhooks.registration.token);
     let channel = await bot.guild.channels.fetch(config.channels.registrations) as TextChannel;
 
     try {
