@@ -1,7 +1,8 @@
 import {SlashCommandBuilder} from "@discordjs/builders";
-import {CommandInteraction, MessageAttachment} from "discord.js";
+import {CommandInteraction, InteractionReplyOptions, MessageAttachment} from "discord.js";
 import * as Canvas from "canvas";
 import * as fs from "fs";
+import PictureImage from "../objects/images/Picture.Image";
 
 module.exports = {
 
@@ -17,9 +18,10 @@ module.exports = {
         )
     ,
 
-    async execute(interaction: CommandInteraction) {
+    async execute(interaction: CommandInteraction): Promise<InteractionReplyOptions> {
         let json;
         let color: string;
+        let response: InteractionReplyOptions = {content: `<@${interaction.user.id}>`, ephemeral: true};
         let hex = interaction.options.getString("hex");
         if (fs.existsSync("./colors.json")) {
             json = JSON.parse(fs.readFileSync("./colors.json").toString());
@@ -31,17 +33,18 @@ module.exports = {
                 color = hex.replace("#", "");
                 for (const value in json) {
                     if (getSimilarity(json[value], color) < 10) {
-                        if (value != interaction.user.id) return ({content: `Sorry, this color is too similar to <@!${value}>'s color`, ephemeral: true});
+                        if (value != interaction.user.id) response.content = `Sorry, this color is too similar to <@!${value}>'s color`;
                     }
                 }
                 json[interaction.user.id] =  color;
                 fs.writeFileSync("./colors.json", JSON.stringify(json, null, 2));
             } else {
-                return ({content: `Sorry, the hex code your provided, \`${hex}\`, is invalid.`, ephemeral: true});
+                response.content = `Sorry, the hex code your provided, \`${hex}\`, is invalid.`;
             }
         }
         else if (json[interaction.user.id] != null) {
             color = json[interaction.user.id];
+            response.files = [await PictureImage.build(color, interaction.user.username)];
         } else {
             let invalid = true;
             color = Math.floor(Math.random()*16777215).toString(16);
@@ -56,9 +59,10 @@ module.exports = {
                 }
             }
             json[interaction.user.id] =  color;
+            response.files = [await PictureImage.build(color, interaction.user.username)];
             fs.writeFileSync("./colors.json", JSON.stringify(json, null, 2));
         }
-        return ({content: `<@${interaction.user.id}>`, files: [await buildPfp(color, interaction.user.username)]});
+        return response;
     }
 }
 
@@ -66,8 +70,6 @@ function validHex(hex) {
     let pattern = new RegExp("^#([a-fA-F0-9]){3}$|[a-fA-F0-9]{6}$");
     return pattern.test(hex);
 }
-
-
 
 function getSimilarity(one, two) {
     let result;
@@ -91,41 +93,4 @@ function getSimilarity(one, two) {
     } catch (e) {
         return 0;
     }
-}
-
-async function buildPfp(color, username) {
-    const canvas = Canvas.createCanvas(512, 512);
-    const ctx = canvas.getContext('2d');
-    const purdueLogo = await Canvas.loadImage("./media/r6purduelogo.png");
-
-    ctx.beginPath();
-    ctx.arc(256, 256, 256, 0, 2 * Math.PI, false);
-    ctx.fillStyle = `#${color}`;
-    ctx.fill();
-
-    printImage(ctx, purdueLogo, 142.5, 128, 227, 256, 0);
-
-    return new MessageAttachment( canvas.toBuffer(),`${username}-profile.png`);
-}
-
-function roundedImage(ctx, x, y, width, height, radius) {
-    ctx.beginPath();
-    ctx.moveTo(x + radius, y);
-    ctx.lineTo(x + width - radius, y);
-    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-    ctx.lineTo(x + width, y + height - radius);
-    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-    ctx.lineTo(x + radius, y + height);
-    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-    ctx.lineTo(x, y + radius);
-    ctx.quadraticCurveTo(x, y, x + radius, y);
-    ctx.closePath();
-}
-
-function printImage(ctx, image, x, y, width, height, radius) {
-    roundedImage(ctx, x, y, width, height, radius);
-    ctx.clip();
-    ctx.drawImage(image, x, y, width, height);
-    ctx.restore();
-    ctx.save();
 }

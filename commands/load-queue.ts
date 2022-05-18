@@ -1,8 +1,8 @@
 import {SlashCommandBuilder} from "@discordjs/builders";
-import {CommandInteraction} from "discord.js";
+import {CommandInteraction, InteractionReplyOptions} from "discord.js";
 import {collections} from "../database/database.service";
 import Player from "../objects/Player";
-import {bot} from "../App";
+import {bot} from "../index";
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -10,7 +10,7 @@ module.exports = {
         .setDescription("Queue testing command")
         .setDefaultPermission(false),
 
-    async execute(interaction: CommandInteraction) {
+    async execute(interaction: CommandInteraction): Promise<InteractionReplyOptions> {
         let documents = await collections.players.find().sort({_rank: 1}).limit(10).toArray();
         for (const document of documents) {
             let player = Player.fromObject(document);

@@ -11,11 +11,13 @@ module.exports = {
             .setName("menu_name")
             .setDescription("The name of the menu to setup")
             .setRequired(true)
-            .addChoice("roles", "roles_menu")
-            .addChoice("welcome", "welcome_menu")
-            .addChoice("ranks", "ranks_menu")
-            .addChoice("pronouns", "pronouns_menu")
-            .addChoice("league", "league_menu")
+            .setChoices(
+                {name: "roles", value: "roles_menu"},
+                {name: "welcome", value: "welcome_menu"},
+                {name: "ranks", value: "ranks_menu"},
+                {name: "league", value: "league_menu"},
+                {name: "register", value: "register_menu"}
+            )
         )
     ,
 
@@ -34,6 +36,9 @@ module.exports = {
                 break;
             case "league_menu":
                 response = await buildLeagueMenu();
+                break;
+            case "register_menu":
+                response = await buildRegisterMenu();
                 break;
             default: response = {content: "Unknown setup menu", ephemeral: true};
         }
@@ -123,15 +128,38 @@ async function buildRanksMenu() {
     return ({embeds: [embed], components: [row, row2]});
 }
 
+async function buildRegisterMenu() {
+    let embed = new MessageEmbed()
+        .setTitle("Summer League Registration Menu")
+        .setColor("#f1c40f")
+        .setDescription("" +
+            "• **Solo** - Register Solo.\n" +
+            "• **Duo** - Register with a Duo.\n\n" +
+            "_Google Form Submissions will overwrite Discord Submissions_");
+
+    let row = new MessageActionRow()
+        .addComponents(
+            new MessageButton()
+                .setLabel("Solo")
+                .setStyle('SUCCESS')
+                .setCustomId("solo"),
+            new MessageButton()
+                .setLabel("Duo")
+                .setStyle('SUCCESS')
+                .setCustomId("duo"),
+        )
+
+    return ({embeds: [embed], components: [row]});
+}
+
 async function buildRoleMenu() {
     let embed = new MessageEmbed()
         .setTitle("R6@Purdue Server Roles")
         .setColor("#f1c40f")
         .setDescription("" +
-            "• Purdue - React if you are an alumnus, student, or incoming freshman.\n" +
-            "• Other - React if you aren't affiliated with Purdue.\n" +
-            "• Games - React to receive access game night channels and notifications.\n" +
-            "• PUPL - React to receive access to ten-mans channels and notifications.");
+            "• **Purdue** - React if you are an alumnus, student, or incoming freshman.\n" +
+            "• **PUPL** - React to receive access to ten-mans channels and notifications.\n" +
+            "• **Game Night** - React to receive access game night channels and notifications.");
 
     let row = new MessageActionRow()
         .addComponents(
@@ -140,11 +168,6 @@ async function buildRoleMenu() {
                 .setStyle('SECONDARY')
                 .setEmoji(config.emotes.purdue)
                 .setCustomId(config.roles.purdue),
-            new MessageButton()
-                .setLabel("Other")
-                .setStyle('SECONDARY')
-                .setEmoji(config.emotes.other)
-                .setCustomId(config.roles.other),
             new MessageButton()
                 .setLabel("Games")
                 .setStyle('SECONDARY')

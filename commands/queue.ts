@@ -1,6 +1,6 @@
 import {SlashCommandBuilder} from "@discordjs/builders";
 import {ButtonInteraction, CommandInteraction, Message} from "discord.js";
-import {bot} from "../App";
+import {bot} from "../index";
 import Player from "../objects/Player";
 
 module.exports = {

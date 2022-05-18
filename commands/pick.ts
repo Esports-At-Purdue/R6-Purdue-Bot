@@ -1,5 +1,5 @@
 import {SlashCommandBuilder} from "@discordjs/builders";
-import {CommandInteraction, SelectMenuInteraction} from "discord.js";
+import {CommandInteraction, SelectMenuInteraction, TextChannel} from "discord.js";
 import Game from "../objects/Game";
 import {collections} from "../database/database.service";
 import Player from "../objects/Player";

@@ -1,8 +1,8 @@
 import {SlashCommandBuilder} from "@discordjs/builders";
-import {CommandInteraction} from "discord.js";
+import {CommandInteraction, InteractionReplyOptions} from "discord.js";
 import Game from "../objects/Game";
 import Player from "../objects/Player";
-import {bot} from "../App";
+import {bot} from "../index";
 import Queue from "../objects/Queue";
 import * as blacklist from "../blacklist.json";
 import {updateRankings} from "../database/database.service";
@@ -50,9 +50,9 @@ module.exports = {
                     .setName("winner")
                     .setDescription("The winner of this game")
                     .setRequired(true)
-                    .setChoices([
-                            ["Team 1", 0], ["Team 2", 1]
-                        ]
+                    .setChoices(
+                        {name: "Team 1", value: 0},
+                        {name: "Team 2", value: 1}
                     )
                 )
             )
@@ -80,11 +80,11 @@ module.exports = {
                     .setDescription("The new map")
                     .setRequired(true)
                     // "Bank", "Chalet", "Clubhouse", "Coastline", "Kafe Dostoyevsky", "Oregon", "Villa"
-                    .setChoices([
-                            ["Bank", "Bank"], ["Chalet", "Chalet"], ["Clubhouse", "Clubhouse"],
-                            ["Coastline", "Coastline"], ["Kafe Dostoyevsky", "Kafe Dostoyevsky"],
-                            ["Oregon", "Oregon"], ["Villa", "Villa"]
-                        ]
+                    .setChoices(
+                        {name: "Bank", value: "Bank"}, {name: "Chalet", value: "Chalet"},
+                        {name: "Clubhouse", value: "Clubhouse"}, {name: "Coastline", value: "Coastline"},
+                        {name: "Kafe Dostoyevsky", value: "Kafe Dostoyevsky"},
+                        {name: "Oregon", value: "Oregon"}, {name: "Villa", value: "Villa"}
                     )
                 )
             )
@@ -201,10 +201,11 @@ module.exports = {
                     .setName("unit")
                     .setDescription("The unit of time to use")
                     .setRequired(true)
-                    .setChoices([
-                            ["Second(s)", "seconds"], ["Minute(s)", "minutes"], ["Hour(s)", "hours"],
-                            ["Day(s)", "days"],["Week(s)", "weeks"], ["Month(s)", "months"], ["Year(s)", "years"]
-                        ]
+                    .setChoices(
+                        {name: "Second(s)", value: "seconds"}, {name: "Minute(s)", value: "minutes"},
+                        {name: "Hour(s)", value: "hours"}, {name: "Day(s)", value: "days"},
+                        {name: "Week(s)", value: "weeks"}, {name: "Month(s)", value: "months"},
+                        {name: "Year(s)", value: "years"}
                     )
                 )
             )
@@ -220,12 +221,10 @@ module.exports = {
         )
     ,
 
-
-    async execute(interaction: CommandInteraction) {
-        //await interaction.deferReply();
+    async execute(interaction: CommandInteraction): Promise<InteractionReplyOptions> {
         let subcommandGroup = interaction.options.getSubcommandGroup()
         let subcommand = interaction.options.getSubcommand();
-        let response;
+        let response = {content: null, ephemeral: true};
         let player;
         let user;
 
@@ -240,28 +239,28 @@ module.exports = {
                             if (sub) {
                                 if (target) {
                                     if (await game.sub(sub, target)) {
-                                        response = {content: `<@!${sub.id}> has been subbed in for <@!${target.id}>`}
-                                    } else response = {content: "This substitution could not be completed.", ephemeral: true};
-                                } else response = {content: "The target is not a valid player.", ephemeral: true};
-                            } else response = {content: "The sub is not a valid player.", ephemeral: true};
+                                        response.content = `<@!${sub.id}> has been subbed in for <@!${target.id}>`;
+                                    } else response.content = "This substitution could not be completed.";
+                                } else response.content = "The target is not a valid player.";
+                            } else response.content = "The sub is not a valid player.";
                             break;
                         case "set-winner":
                             let code = interaction.options.getInteger("winner");
                             await game.end(code);
-                            response = {content: `Game ${game.id} result has been set. Team ${code + 1} won!`};
+                            response.content = `Game ${game.id} result has been set. Team ${code + 1} won!`;
                             break;
                         case "set-draw":
                             await game.end(2);
-                            response = {content: `Game ${game.id} result has been set. It's a draw!`};
+                            response.content = `Game ${game.id} result has been set. It's a draw!`;
                             break;
                         case "set-map":
                             let map = interaction.options.getString("map");
                             game.map = map;
                             await game.save();
-                            response = {content: `Game ${game.id} has been moved to ${map}.`};
+                            response.content = `Game ${game.id} has been moved to ${map}.`;
                             break;
                     }
-                } else response = {content: "This game does not exist.", ephemeral: true};
+                } else response.content = "This game does not exist.";
                 break;
             case "queue":
                 switch (subcommand) {
@@ -270,9 +269,9 @@ module.exports = {
                         if (player) {
                             if (!bot.queue.has(player.id)) {
                                 await bot.queue.join(player);
-                                response = {content: `${player.username} has been added`, ephemeral: true};
-                            } else response = {content: `${player.username} is already in queue.`, ephemeral: true};
-                        } else response = {content: "This player is not registered.", ephemeral: true};
+                                response.content = `${player.username} has been added`;
+                            } else response.content = `${player.username} is already in queue.`;
+                        } else response.content = "This player is not registered.";
                         break;
                     case "kick":
                         player = await Player.get(interaction.options.getUser("target").id);
@@ -280,14 +279,14 @@ module.exports = {
                             if (bot.queue.has(player.id)) {
                                 bot.queue.delete(player.id);
                                 await bot.queue.update(`${player.username} has been removed`, 2);
-                                response = {content: `${player.username} has been kicked from the queue.`, ephemeral: true};
-                            } else response = {content: `${player.username} is not in the queue.`, ephemeral: true};
-                        } else response = {content: "This player is not registered.", ephemeral: true};
+                                response.content = `${player.username} has been kicked from the queue.`;
+                            } else response.content = `${player.username} is not in the queue.`;
+                        } else response.content = "This player is not registered.";
                         break;
                     case "reset":
                         bot.queue = new Queue(bot.lobbyChannel);
                         await bot.queue.update("The queue has been reset.", 2);
-                        response = {content: "The queue has been reset.", ephemeral: true};
+                        response.content = "The queue has been reset.";
                         break;
                 }
                 break;
@@ -301,11 +300,11 @@ module.exports = {
                             let username = interaction.options.getString("username");
                             player.username = username;
                             await player.save();
-                            if (isValidUsername(username)) response = {content: `${oldUsername} is now ${username}.`, ephemeral: true};
-                            else response = {content: `${oldUsername} is now ${username}. Warning, this username is against the rules. Please address this.`, ephemeral: true};
+                            if (isValidUsername(username)) response.content = `${oldUsername} is now ${username}.`;
+                            else response.content = `${oldUsername} is now ${username}. Warning, this username is against the rules. Please address this.`;
                             break;
                         case "register":
-                            response = {content: "This player is already registered", ephemeral: true};
+                            response.content = "This player is already registered";
                             break;
                         case "set-stats":
                             player.points = interaction.options.getInteger("points") ?? player.points;
@@ -314,7 +313,7 @@ module.exports = {
                             player.draws = interaction.options.getInteger("draws") ?? player.draws;
                             await player.save();
                             await updateRankings();
-                            response = {content: `${player.username} has been updated.`, ephemeral: true};
+                            response.content = `${player.username} has been updated.`;
                             break;
                         case "ban":
                             let magnitude = interaction.options.getInteger("length");
@@ -334,24 +333,24 @@ module.exports = {
                                 bot.queue.delete(player.id);
                                 await bot.queue.update(`${player.username} has been kicked from the queue`, 2);
                             }
-                            response = ({content: `**${player.username}** has been banned from the PUPL until <t:${time}:F>`});
+                            response.content = `**${player.username}** has been banned from the PUPL until <t:${time}:F>`;
                             break;
                         case "unban":
                             player.banTime = 0;
                             await player.save();
-                            response = {content: `**${player.username}** has been unbanned from the PUPL`};
+                            response.content = `**${player.username}** has been unbanned from the PUPL`;
                             break;
                     }
                 } else {
                     if (subcommand == "register") {
                         let username = interaction.options.getString("username") ?? interaction.options.getUser("target").username;
                         player = Player.post(new Player(user.id, username));
-                        response = {content: `<@!${user.id}> has been registered as ${username}.`};
-                    } else response = {content: "This player is not registered.", ephemeral: true};
+                        response.content = `<@!${user.id}> has been registered as ${username}.`;
+                    } else response.content = "This player is not registered.";
                 }
                 break;
             default:
-                response = {content: "Something went very wrong... Please send this to <@!751910711218667562>."};
+                response.content = "Something went very wrong... Please send this to <@!751910711218667562>.";
                 await bot.logger.fatal("Manage Command Failed", new Error("Inaccessible option"));
         }
 

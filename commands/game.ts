@@ -1,7 +1,7 @@
 import {SlashCommandBuilder} from "@discordjs/builders";
-import {CommandInteraction} from "discord.js";
+import {CommandInteraction, InteractionReplyOptions} from "discord.js";
 import Game from "../objects/Game";
-import {bot} from "../App";
+import GameImage from "../objects/images/Game.Image";
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -20,8 +20,8 @@ module.exports = {
         )
     ,
 
-    async execute(interaction: CommandInteraction) {
-        let response;
+    async execute(interaction: CommandInteraction): Promise<InteractionReplyOptions> {
+        let response = {content: null, embeds: null, files: null, ephemeral: true};
         const subcommand = interaction.options.getSubcommand();
         const game = await Game.get(interaction.options.getInteger("id").toString());
 
@@ -29,15 +29,15 @@ module.exports = {
             switch (subcommand) {
                 case "info":
                     const embed = await game.toEmbed();
-                    //const file = await game.toImage();
-                    response = ({embeds: [embed]});
+                    const file = await GameImage.build(game);
+                    response.content = `<@${interaction.user.id}>`;
+                    response.embeds = [embed];
+                    response.files = [file]
+                    response.ephemeral = false;
                     break;
-                default:
-                    response = {content: "Something went very wrong... Please send this to <@!751910711218667562>.", ephemeral: true};
-                    await bot.logger.fatal("Manage Command Failed", new Error("Inaccessible option"));
             }
         }
-        else response = {content: "This game does not exist.", ephemeral: true};
+        else response.content ="This game does not exist.";
 
         return response;
     }

@@ -1,8 +1,9 @@
 import {SlashCommandBuilder} from "@discordjs/builders";
-import {CommandInteraction, GuildMember} from "discord.js";
+import {CommandInteraction, GuildMember, InteractionReplyOptions} from "discord.js";
 import Player from "../objects/Player";
 import * as blacklist from "../blacklist.json";
 import {updateRankings} from "../database/database.service";
+import ProfileImage from "../objects/images/Profile.Image";
 
 const censoredWords = blacklist.list.split(" ");
 
@@ -34,9 +35,9 @@ module.exports = {
         )
     ,
 
-    async execute(interaction: CommandInteraction) {
-        let response;
-        let player;
+    async execute(interaction: CommandInteraction): Promise<InteractionReplyOptions> {
+        let response = {content: null, files: null, ephemeral: true};
+        let player: Player;
         await updateRankings();
         const subcommand = interaction.options.getSubcommand();
         switch (subcommand) {
@@ -44,10 +45,11 @@ module.exports = {
                 const mentionable = interaction.options.getMentionable('target') as GuildMember;
                 player = mentionable ? await Player.get(mentionable.id) : await Player.get(interaction.user.id);
                 if (player) {
-                    const image = await player.toImage();
-                    response = ({content: `<@${interaction.user.id}>`, files: [image]});
+                    response.content = `<@${interaction.user.id}>`
+                    response.files = [await ProfileImage.build(player)];
+                    response.ephemeral = false;
                 } else {
-                    response = {content: `Unable to retrieve this profile`, ephemeral: true};
+                    response.content = `Unable to retrieve this profile`;
                 }
                 break;
 
@@ -58,12 +60,12 @@ module.exports = {
                     if (isValidUsername(username)) {
                         player.username = username;
                         await Player.put(player);
-                        response = {content: `Success! You have changed your username to \`${username}\``, ephemeral: true}
+                        response.content = `Success! You have changed your username to \`${username}\``;
                     } else {
-                        response = {content: `Sorry, the provided username, \`${username}\`, isn't allowed`, ephemeral: true}
+                        response.content = `Sorry, the provided username, \`${username}\`, isn't allowed`;
                     }
                 } else {
-                    response = {content: `Unable to retrieve this profile`, ephemeral: true};
+                    response.content = `Unable to retrieve this profile`;
                 }
         }
         return response;

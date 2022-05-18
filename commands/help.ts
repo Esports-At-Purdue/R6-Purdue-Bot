@@ -1,31 +1,42 @@
 import {SlashCommandBuilder} from "@discordjs/builders";
-import {CommandInteraction, MessageEmbed} from "discord.js";
-import {bot} from "../App";
+import {CommandInteraction, InteractionReplyOptions, MessageEmbed} from "discord.js";
+import {bot} from "../index";
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("help")
         .setDescription("Displays info about other commands.")
-        .setDefaultPermission(true),
+        .setDefaultPermission(true)
 
-    async execute(interaction: CommandInteraction) {
-        let response;
-        let embed = new MessageEmbed().setTitle("Help Menu - R6@Purdue").setColor("#5a69ea").setDescription("");
-        let list = [];
+        .addStringOption((string) => string
+            .setName("command")
+            .setDescription("The command view")
+            .setRequired(false)
+        )
+    ,
+
+    async execute(interaction: CommandInteraction): Promise<InteractionReplyOptions> {
+        let response = {content: null, embeds: null, ephemeral: true};
+        const embed = new MessageEmbed().setTitle("Help Menu - R6@Purdue").setColor("#5a69ea").setDescription("");
+        const command = interaction.options.getString("command") ?? "";
+        const list = [];
         await bot.commands.forEach(command => {
             list.push([toTitleCase(command.data.name), command.data.description, command.data.options])
         });
         list.sort();
         for (const [name, description, options] of list) {
-            //if (name == "Verify") {
+            if (name.toLowerCase().includes(command.toLowerCase())) {
                 embed.setDescription(embed.description.concat(`**${name}** - ${description}\n`));
                 for (const option of options) {
                     embed.setDescription(embed.description.concat(mapOptions(name.toLowerCase(), option)));
                     //console.log(mapOptions(name, option));
                 }
                 embed.setDescription(embed.description.concat("\n"))
-            //}
-        } response = ({embeds: [embed]});
+            }
+        }
+        response.content = `<@${interaction.user.id}>`;
+        response.embeds = [embed];
+
         return response;
     }
 }
