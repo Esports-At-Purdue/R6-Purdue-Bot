@@ -15,7 +15,7 @@ import * as fs from "fs";
 import * as request from "postman-request";
 import Logger from "./Logger";
 import Registrant from "./Registrant";
-import {bot} from "../App";
+import {bot, registrants} from "../index";
 
 const options = {
     intents: [
@@ -25,8 +25,6 @@ const options = {
         Intents.FLAGS.DIRECT_MESSAGE_REACTIONS, Intents.FLAGS.GUILD_PRESENCES
     ]
 } as ClientOptions;
-
-let registrants: Array<Registrant> = [];
 
 export default class Bot extends Client{
     private _guild: Guild;
@@ -85,12 +83,6 @@ export default class Bot extends Client{
         await connectToDatabase()
         await this.initializeQueue();
         await this.initializeCommands(config.token);
-        setInterval(async function() {
-            await updateRegistrants();
-            if (new Date().getMinutes() == 0 && new Date().getHours() % 6 == 0) {
-                await updateRegistrations();
-            }
-        }, 60000)
     }
 
     async initializeQueue() {
@@ -127,88 +119,4 @@ export default class Bot extends Client{
             await this.logger.error("Error uploading application commands", error);
         }
     }
-}
-
-async function updateRegistrants() {
-    const CLIENT_KEY = config.google_key;
-    const RANGES = "A2:I51";
-    const ID = "1509hLAPyanr-sSytm5dSDAcIlBjPGZFVEwoY8LYSlwo";
-    const URL = `https://sheets.googleapis.com/v4/spreadsheets/${ID}?key=${CLIENT_KEY}&ranges=${RANGES}&includeGridData=true`;
-
-    request(URL, async function (error, response, body) {
-        let json = JSON.parse(body)
-        let rowData = json.sheets[0].data[0].rowData;
-        let total = registrants.length;
-        registrants = [];
-
-        for (let i = 0; i < 50; i++) {
-            let data = rowData[i].values;
-            let uplay = data[1]["formattedValue"];
-            let discord = data[2]["formattedValue"];
-            let purdue = data[3]["formattedValue"];
-
-            if (data[5]["formattedValue"] == "Solo") {
-                registrants.push(new Registrant(uplay, discord, purdue === "true", true, false, null));
-            } else if (data[5]["formattedValue"] == "Sub") {
-                registrants.push(new Registrant(uplay, discord, purdue === "true", false, true, null));
-            } else if (data[5]["formattedValue"] == "Duo") {
-                let partnerDiscord = data[6]["formattedValue"];
-                let duo = false;
-                for (let i = 0; i < registrants.length; i++) {
-                    let registrant = registrants[i];
-                    if (registrant.discord === partnerDiscord) {
-                        registrant = new Registrant(uplay, discord, purdue === "true", false, false, null);
-                        registrants[i].partner = registrant;
-                        duo = true;
-                    }
-                }
-                if (!duo) {
-                    registrants.push(new Registrant(uplay, discord, purdue === "true", false, false, null));
-                }
-            }
-        }
-
-        if (registrants.length != total) {
-            await updateRegistrations();
-        }
-    });
-}
-
-async function updateRegistrations() {
-    let total = registrants.length;
-    let embed = new MessageEmbed().setColor("#8bc34a");
-    let soloField = {name: "Solos", value: "", inline: true};
-    let duoField = {name: "Duos", value: "", inline: true};
-    let subField = {name: "Subs", value: "", inline: true}
-
-    registrants.forEach(registrant => {
-        if (registrant.solo) {
-            soloField.value += `${registrant.uplay}\n`;
-        } else if (registrant.sub) {
-            total -= 1;
-            subField.value += `${registrant.uplay}\n`
-        } else {
-            if (registrant.partner != null && registrant.partner.uplay != null) {
-                total += 1;
-                duoField.value += `${registrant.uplay} + ${registrant.partner.uplay}\n`;
-            } else {
-                duoField.value += `${registrant.uplay} + **Unconfirmed**\n`;
-            }
-        }
-    })
-
-    embed.addField(soloField.name, soloField.value, soloField.inline);
-    embed.addField(duoField.name, duoField.value, duoField.inline);
-    embed.addField(subField.name, subField.value, subField.inline);
-    embed.setTitle(`Spots Remaining: ${50 - total}`);
-
-    let webhook = await bot.fetchWebhook(config.webhooks.registration.id, config.webhooks.registration.token);
-    let channel = await bot.guild.channels.fetch(config.channels.registrations) as TextChannel;
-
-    try {
-        await channel.messages.fetch({limit: 1}).then(messages => {
-            messages.first().delete();
-        })
-    } catch {}
-    await webhook.send({embeds: [embed]});
 }

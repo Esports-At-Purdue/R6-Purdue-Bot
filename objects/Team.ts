@@ -1,6 +1,6 @@
 import {collections} from "../database/database.service";
 import * as config from "../config.json";
-import {bot} from "../App";
+import {bot} from "../index";
 import {CategoryChannel} from "discord.js";
 import Player from "./Player";
 

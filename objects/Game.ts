@@ -1,7 +1,7 @@
 import Team from "./Team";
 import * as config from "../config.json";
 import Queue from "./Queue";
-import {bot} from "../App";
+import {bot} from "../index";
 import {
     CategoryChannel,
     MessageActionRow,
@@ -292,61 +292,6 @@ export default class Game implements DatabaseObject {
                 break;
         }
         return embed;
-    }
-
-    public async toImage(): Promise<MessageAttachment> {
-        let font = "px sans-serif";
-        const canvas = Canvas.createCanvas(500, 554);
-        const ctx = canvas.getContext('2d');
-        const background = await Canvas.loadImage("./media/background.png");
-        const panel = await Canvas.loadImage("./media/panel.png");
-        const gray = await Canvas.loadImage("./media/gray.png");
-        const r6logo = await Canvas.loadImage("./media/r6logo4.png");
-        const purdueLogo = await Canvas.loadImage("./media/r6purduelogo.png");
-        const map = await Canvas.loadImage(`./maps/${this.map.replace(/ /g,"_").toLowerCase()}.jpg`);
-
-        printImage(ctx, background, 0, 0, canvas.width, canvas.height, 10);
-        printImage(ctx, gray, 10, 75, canvas.width - 20, canvas.height - 85, 10);
-        printImage(ctx, panel, 13, 78, canvas.width - 26, canvas.height - 360, 10);
-        printImage(ctx, purdueLogo, 15, 10, 50, 54, 0);
-        printImage(ctx, r6logo, canvas.width - 70, 8, 60, 60, 0);
-        printImage(ctx, map, 13, 275, 474, 266, 10);
-        printText(ctx, `Game ${this.id}`, canvas.width / 2, 40, "#ffffff", `32${font}`, "center");
-        printText(ctx, `Purdue University Pro League`, canvas.width / 2, 64, "#ffffff", `20${font}`, "center");
-
-        if (this.phase == 0) {
-            if (this.winner && this.loser) {
-                let winner = Team.fromObject(this.winner);
-                let loser = Team.fromObject(this.loser);
-                for (let i = 0; i < 5; i++) {
-                    let winnerPlayer = Player.fromObject(winner.players[i]);
-                    let loserPlayer = Player.fromObject(loser.players[i]);
-                    console.log(winnerPlayer.username);
-                    console.log(loserPlayer.username)
-                    let winnerAvatar = await Canvas.loadImage((await bot.guild.members.fetch(winnerPlayer.id)).user.displayAvatarURL({ format: 'jpg' }));
-                    let loserAvatar = await Canvas.loadImage((await bot.guild.members.fetch(loserPlayer.id)).user.displayAvatarURL({ format: 'jpg' }));
-                    printAvatar(ctx, winnerAvatar, canvas.width / 5, 135 + i * 30);
-                    printAvatar(ctx, loserAvatar, canvas.width - canvas.width / 5, 135 + i * 25);
-                }
-            } else {
-                for (let i = 0; i < 2; i++) {
-                    let team = Team.fromObject(this.teams[i]);
-                    printText(ctx, `Draw`, canvas.width / 4 + i * (canvas.width / 2), 110, "#000000", `28${font}`, "center");
-                    for (let j = 0; j < 5; j++) {
-                        let player = Player.fromObject(team.players[j]);
-                        let avatar = await Canvas.loadImage((await bot.guild.members.fetch(player.id)).user.avatarURL({format: "jpg"}));
-                        printAvatar(ctx, avatar, i, j);
-                        printText(ctx, player.username, canvas.width / 4 + i * (canvas.width / 2), 135 + j * 25, "#000000", `24${font}`, "center");
-                    }
-                }
-            }
-        } else {
-
-        }
-
-
-
-        return (new MessageAttachment(canvas.toBuffer(), `game-${this._id}.png`));
     }
 
     async save(): Promise<boolean> {

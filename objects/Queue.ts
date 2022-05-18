@@ -1,5 +1,5 @@
 import {MessageActionRow, MessageButton, MessageEmbed, TextChannel} from "discord.js";
-import {bot} from "../App";
+import {bot} from "../index";
 import Player from "./Player";
 import Game from "./Game";
 import * as config from "../config.json";
